@@ -16,21 +16,24 @@ pub enum Error {
     MissingPacket,
     #[error("The comment header was malformed: {0}")]
     HeaderError(#[from] std::io::Error),
-    #[error("The error was malformed: {0}")]
-    MalformedPacket(String),
+    #[error("The packet was malformed")]
+    MalformedPacket,
     #[error("Encountered a comment which was formatted wrong or was not valid UTF-8.")]
     MalformedComment(Vec<u8>),
+    #[error("Expected UTF-8 content, but it was invalid")]
+    UTFError(#[from] std::string::FromUtf8Error),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Debug)]
 pub struct Tag {
+    vendor: String,
     comments: HashMap<String, Vec<String>>,
 }
 
 impl Tag {
-    pub fn new(comments: Vec<(String, String)>) -> Self {
+    pub fn new(vendor: String, comments: Vec<(String, String)>) -> Self {
         let mut comments_map = HashMap::new();
         for (key, value) in comments.into_iter() {
             comments_map
@@ -40,6 +43,7 @@ impl Tag {
         }
 
         Self {
+            vendor,
             comments: comments_map,
         }
     }
@@ -65,6 +69,14 @@ impl Tag {
     pub fn remove_entries(&mut self, tag: &str) -> Option<Vec<String>> {
         self.comments.remove(tag)
     }
+
+    pub fn get_vendor(&self) -> &str {
+        &self.vendor
+    }
+
+    pub fn set_vendor(&mut self, new_vendor: String) {
+        self.vendor = new_vendor;
+    }
 }
 
 pub fn read_from<R: Read + Seek>(f_in: R) -> Result<Tag> {
@@ -78,9 +90,11 @@ pub fn read_from<R: Read + Seek>(f_in: R) -> Result<Tag> {
     cursor.seek_relative(8)?; // length of string "OpusTags"
     let mut buffer = [0; 4];
     cursor.read_exact(&mut buffer)?;
-    let vendor_length = u32::from_le_bytes(buffer);
-    // we don't care about what the vendor actually is so we can skip it
-    cursor.seek_relative(vendor_length.into())?;
+    // only panics on platforms where usize < 32 bits
+    let vendor_length: usize = u32::from_le_bytes(buffer).try_into().unwrap();
+    let mut buffer = vec![0; vendor_length];
+    cursor.read_exact(&mut buffer)?;
+    let vendor = String::from_utf8(buffer)?;
     let mut buffer = [0; 4];
     cursor.read_exact(&mut buffer)?;
     let comment_count = u32::from_le_bytes(buffer);
@@ -100,7 +114,7 @@ pub fn read_from<R: Read + Seek>(f_in: R) -> Result<Tag> {
             .ok_or_else(|| Error::MalformedComment(buffer.clone()))?;
         comments.push(pair);
     }
-    Ok(Tag::new(comments))
+    Ok(Tag::new(vendor, comments))
 }
 
 pub fn read_from_path<P: AsRef<Path>>(path: P) -> Result<Tag> {
