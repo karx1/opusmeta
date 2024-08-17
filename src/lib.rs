@@ -3,6 +3,7 @@
 pub mod picture;
 
 use ogg::{PacketReader, PacketWriteEndInfo, PacketWriter};
+use picture::{Picture, PictureDecodeError, PictureType};
 use std::collections::HashMap;
 use std::fs::File;
 use std::fs::OpenOptions;
@@ -30,7 +31,7 @@ pub enum Error {
     #[error("The content was too big for the Opus spec")]
     TooBigError,
     #[error("An error occured when decoding a picture: {0}")]
-    PictureDecodeError(#[from] picture::PictureDecodeError),
+    PictureDecodeError(#[from] PictureDecodeError),
     #[error("This crate expects `usize` to be at least 32 bytes in size.")]
     PlatformError(#[from] std::num::TryFromIntError),
 }
@@ -95,6 +96,57 @@ impl Tag {
 
     pub fn set_vendor(&mut self, new_vendor: String) {
         self.vendor = new_vendor;
+    }
+
+    pub fn add_picture(&mut self, picture: &Picture) -> Result<()> {
+        let _ = self.remove_picture_type(picture.picture_type)?;
+        let data = picture.to_base64()?;
+        self.add_one("METADATA_BLOCK_PICTURE".to_string(), data);
+        Ok(())
+    }
+
+    pub fn remove_picture_type(&mut self, picture_type: PictureType) -> Result<Option<Picture>> {
+        let Some(pictures) = self.comments.get_mut("metadata_block_picture") else {
+            return Ok(None);
+        };
+        let mut index_to_remove = 0;
+        for (index, data) in (*pictures).iter().enumerate() {
+            let pic = Picture::from_base64(data)?;
+            if pic.picture_type == picture_type {
+                index_to_remove = index;
+            }
+        }
+
+        Picture::from_base64(&pictures.remove(index_to_remove)).map(Some)
+    }
+
+    #[must_use]
+    pub fn get_picture_type(&self, picture_type: PictureType) -> Option<Picture> {
+        let pictures = self.comments.get("metadata_block_picture")?;
+        for picture in pictures {
+            if let Ok(decoded) = Picture::from_base64(picture) {
+                if decoded.picture_type == picture_type {
+                    return Some(decoded);
+                }
+            }
+        }
+
+        None
+    }
+
+    #[must_use]
+    pub fn pictures(&self) -> Vec<Picture> {
+        let Some(pictures_raw) = self.comments.get("metadata_block_picture") else {
+            return vec![];
+        };
+        let mut output = vec![];
+        for picture in pictures_raw {
+            if let Ok(decoded) = Picture::from_base64(picture) {
+                output.push(decoded);
+            }
+        }
+
+        output
     }
 }
 

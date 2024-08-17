@@ -1,9 +1,10 @@
 use crate::Result;
+use base64::prelude::{Engine as _, BASE64_STANDARD};
 use std::io::{Cursor, Read};
 use thiserror::Error;
 
 #[allow(dead_code)] // todo: change this to expect
-#[derive(Default, Debug, Clone, Copy)]
+#[derive(Default, Debug, Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
 #[repr(u32)]
 pub enum PictureType {
     #[default]
@@ -39,7 +40,7 @@ impl PictureType {
     }
 }
 
-#[derive(Debug, Copy, Clone, Error)]
+#[derive(Debug, Clone, Error)]
 pub enum PictureDecodeError {
     #[error("Invalid picture type")]
     InvalidPictureType,
@@ -49,19 +50,21 @@ pub enum PictureDecodeError {
     DescriptionTooLong,
     #[error("Picture data is too long (more than u32::MAX bytes long!)")]
     DataTooLong,
+    #[error("Failed to decode base64 data")]
+    Base64DecodeError(#[from] base64::DecodeError),
 }
 
 #[allow(dead_code)]
 #[derive(Default, Clone, Debug)]
 pub struct Picture {
-    picture_type: PictureType,
-    mime_type: String,
-    description: String,
-    width: u32,
-    height: u32,
-    depth: u32,
-    num_colors: u32,
-    data: Vec<u8>,
+    pub picture_type: PictureType,
+    pub mime_type: String,
+    pub description: String,
+    pub width: u32,
+    pub height: u32,
+    pub depth: u32,
+    pub num_colors: u32,
+    pub data: Vec<u8>,
 }
 
 impl Picture {
@@ -168,5 +171,21 @@ impl Picture {
         output.extend_from_slice(&self.data);
 
         Ok(output)
+    }
+
+    pub fn to_base64(&self) -> Result<String> {
+        let bytes = self.to_bytes()?;
+        let encoded = BASE64_STANDARD.encode(bytes);
+
+        Ok(encoded)
+    }
+
+    pub fn from_base64(data: &str) -> Result<Self> {
+        let bytes = BASE64_STANDARD
+            .decode(data)
+            .map_err(PictureDecodeError::from)?;
+        let pic = Self::from_bytes(&bytes)?;
+
+        Ok(pic)
     }
 }
