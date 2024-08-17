@@ -152,7 +152,7 @@ impl Tag {
         // second packet, which is the comment header
         {
             let comment_header_packet = reader.read_packet()?.ok_or(Error::MissingPacket)?;
-            let new_pack_data = self.construct_packet_from_tag()?;
+            let new_pack_data = self.to_packet_data()?;
             writer.write_packet(
                 new_pack_data,
                 comment_header_packet.stream_serial(),
@@ -182,7 +182,7 @@ impl Tag {
         self.write_to(file)
     }
 
-    fn construct_packet_from_tag(&self) -> std::result::Result<Vec<u8>, std::num::TryFromIntError> {
+    fn to_packet_data(&self) -> std::result::Result<Vec<u8>, std::num::TryFromIntError> {
         let mut output = vec![];
         // magic signature
         output.extend_from_slice("OpusTags".as_bytes());
