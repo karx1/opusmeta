@@ -1,3 +1,5 @@
+mod picture;
+
 use ogg::{PacketReader, PacketWriteEndInfo, PacketWriter};
 use std::collections::HashMap;
 use std::fs::File;
@@ -21,10 +23,14 @@ pub enum Error {
     MalformedPacket,
     #[error("Encountered a comment which was formatted wrong or was not valid UTF-8.")]
     MalformedComment(Vec<u8>),
-    #[error("Expected UTF-8 content, but it was invalid")]
+    #[error("Expected valid UTF-8, but did not receive it. See the contained FromUtf8Error for the offending bytes.")]
     UTFError(#[from] std::string::FromUtf8Error),
     #[error("The content was too big for the Opus spec")]
-    TooBigError(#[from] std::num::TryFromIntError),
+    TooBigError,
+    #[error("An error occured when decoding a picture")]
+    PictureDecodeError(#[from] picture::PictureDecodeError),
+    #[error("This crate expects `usize` to be at least 32 bytes in size.")]
+    PlatformError(#[from] std::num::TryFromIntError),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -182,14 +188,14 @@ impl Tag {
         self.write_to(file)
     }
 
-    fn to_packet_data(&self) -> std::result::Result<Vec<u8>, std::num::TryFromIntError> {
+    fn to_packet_data(&self) -> Result<Vec<u8>> {
         let mut output = vec![];
         // magic signature
         output.extend_from_slice("OpusTags".as_bytes());
 
         // encode vendor
         let vendor = &self.vendor;
-        let vendor_length: u32 = vendor.len().try_into()?;
+        let vendor_length: u32 = vendor.len().try_into().map_err(|_| Error::TooBigError)?;
         output.extend_from_slice(&vendor_length.to_le_bytes());
         output.extend_from_slice(vendor.as_bytes());
 
@@ -200,11 +206,14 @@ impl Tag {
             }
         }
 
-        let num_comments: u32 = formatted_tags.len().try_into()?;
+        let num_comments: u32 = formatted_tags
+            .len()
+            .try_into()
+            .map_err(|_| Error::TooBigError)?;
         output.extend_from_slice(&num_comments.to_le_bytes());
 
         for tag in formatted_tags {
-            let tag_length: u32 = tag.len().try_into()?;
+            let tag_length: u32 = tag.len().try_into().map_err(|_| Error::TooBigError)?;
             output.extend_from_slice(&tag_length.to_le_bytes());
             output.extend_from_slice(tag.as_bytes());
         }
