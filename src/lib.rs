@@ -1,8 +1,8 @@
-use ogg::PacketReader;
+use ogg::{PacketReader, PacketWriteEndInfo, PacketWriter};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::Cursor;
-use std::io::{Read, Seek};
+use std::io::{Read, Seek, Write};
 use std::path::Path;
 use thiserror::Error;
 
@@ -22,6 +22,8 @@ pub enum Error {
     MalformedComment(Vec<u8>),
     #[error("Expected UTF-8 content, but it was invalid")]
     UTFError(#[from] std::string::FromUtf8Error),
+    #[error("The content was too big for the Opus spec")]
+    TooBigError(#[from] std::num::TryFromIntError),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -91,7 +93,7 @@ pub fn read_from<R: Read + Seek>(f_in: R) -> Result<Tag> {
     let mut buffer = [0; 4];
     cursor.read_exact(&mut buffer)?;
     // only panics on platforms where usize < 32 bits
-    let vendor_length: usize = u32::from_le_bytes(buffer).try_into().unwrap();
+    let vendor_length: usize = u32::from_le_bytes(buffer).try_into()?;
     let mut buffer = vec![0; vendor_length];
     cursor.read_exact(&mut buffer)?;
     let vendor = String::from_utf8(buffer)?;
@@ -103,7 +105,7 @@ pub fn read_from<R: Read + Seek>(f_in: R) -> Result<Tag> {
         let mut buffer = [0; 4];
         cursor.read_exact(&mut buffer)?;
         // only panics on platforms where usize < 32 bits
-        let comment_length: usize = u32::from_le_bytes(buffer).try_into().unwrap();
+        let comment_length: usize = u32::from_le_bytes(buffer).try_into()?;
         let mut buffer = vec![0; comment_length];
         cursor.read_exact(&mut buffer)?;
         let comment =
@@ -120,4 +122,90 @@ pub fn read_from<R: Read + Seek>(f_in: R) -> Result<Tag> {
 pub fn read_from_path<P: AsRef<Path>>(path: P) -> Result<Tag> {
     let file = File::open(path)?;
     read_from(file)
+}
+
+fn construct_packet_from_tag(tag: Tag) -> std::result::Result<Vec<u8>, std::num::TryFromIntError> {
+    let mut output = vec![];
+    // magic signature
+    output.extend_from_slice("OpusTags".as_bytes());
+
+    // encode vendor
+    let vendor = tag.vendor;
+    let vendor_length: u32 = vendor.len().try_into()?;
+    output.extend_from_slice(&vendor_length.to_le_bytes());
+    output.extend_from_slice(vendor.as_bytes());
+
+    let mut formatted_tags = vec![];
+    for (tag, values) in tag.comments.into_iter() {
+        for value in values.into_iter() {
+            formatted_tags.push(format!("{tag}={value}"));
+        }
+    }
+
+    let num_comments: u32 = formatted_tags.len().try_into()?;
+    output.extend_from_slice(&num_comments.to_le_bytes());
+
+    for tag in formatted_tags {
+        let tag_length: u32 = tag.len().try_into()?;
+        output.extend_from_slice(&tag_length.to_le_bytes());
+        output.extend_from_slice(tag.as_bytes());
+    }
+
+    Ok(output)
+}
+
+fn get_end_info(packet: &ogg::Packet) -> PacketWriteEndInfo {
+    if packet.last_in_stream() {
+        PacketWriteEndInfo::EndStream
+    } else if packet.last_in_page() {
+        PacketWriteEndInfo::EndPage
+    } else {
+        PacketWriteEndInfo::NormalPacket
+    }
+}
+
+pub fn replace<W: Read + Write + Seek>(mut f_in: W, tag: Tag) -> Result<()> {
+    let f_out_raw: Vec<u8> = vec![];
+    let mut cursor = Cursor::new(f_out_raw);
+
+    let mut reader = PacketReader::new(&mut f_in);
+    let mut writer = PacketWriter::new(&mut cursor);
+
+    // first packet
+    {
+        let first_packet = reader.read_packet()?.ok_or(Error::MissingPacket)?;
+        writer.write_packet(
+            first_packet.data.clone(),
+            first_packet.stream_serial(),
+            get_end_info(&first_packet),
+            first_packet.absgp_page(),
+        )?;
+    }
+
+    // second packet, which is the comment header
+    {
+        let comment_header_packet = reader.read_packet()?.ok_or(Error::MissingPacket)?;
+        let new_pack_data = construct_packet_from_tag(tag)?;
+        writer.write_packet(
+            new_pack_data,
+            comment_header_packet.stream_serial(),
+            PacketWriteEndInfo::EndPage,
+            comment_header_packet.absgp_page(),
+        )?;
+    }
+
+    while let Some(packet) = reader.read_packet()? {
+        let stream_serial = packet.stream_serial();
+        let end_info = get_end_info(&packet);
+        let absgp_page = packet.absgp_page();
+        writer.write_packet(packet.data, stream_serial, end_info, absgp_page)?;
+    }
+    // stream ended
+
+    drop(reader);
+    cursor.seek(std::io::SeekFrom::Start(0))?;
+    f_in.seek(std::io::SeekFrom::Start(0))?;
+    std::io::copy(&mut cursor, &mut f_in)?;
+
+    Ok(())
 }
