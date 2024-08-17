@@ -1,6 +1,8 @@
 use ogg::PacketReader;
+use std::fs::File;
 use std::io::Cursor;
 use std::io::{Read, Seek};
+use std::path::Path;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -66,4 +68,9 @@ pub fn read_from<R: Read + Seek>(f_in: R) -> Result<Tag> {
         comments.push(pair);
     }
     Ok(Tag::new(comments))
+}
+
+pub fn read_from_path<P: AsRef<Path>>(path: P) -> Result<Tag> {
+    let file = File::open(path)?;
+    read_from(file)
 }
