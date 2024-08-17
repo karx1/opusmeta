@@ -65,6 +65,7 @@ pub struct Picture {
 }
 
 impl Picture {
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }

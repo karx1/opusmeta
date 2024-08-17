@@ -1,4 +1,6 @@
-mod picture;
+#![allow(clippy::module_name_repetitions)]
+
+pub mod picture;
 
 use ogg::{PacketReader, PacketWriteEndInfo, PacketWriter};
 use std::collections::HashMap;
@@ -42,9 +44,10 @@ pub struct Tag {
 }
 
 impl Tag {
+    #[must_use]
     pub fn new(vendor: String, comments: Vec<(String, String)>) -> Self {
         let mut comments_map = HashMap::new();
-        for (mut key, value) in comments.into_iter() {
+        for (mut key, value) in comments {
             key.make_ascii_lowercase();
             comments_map
                 .entry(key)
@@ -74,6 +77,7 @@ impl Tag {
             .or_insert(values);
     }
 
+    #[must_use]
     pub fn get(&self, mut tag: String) -> Option<&Vec<String>> {
         tag.make_ascii_lowercase();
         self.comments.get(&tag)
@@ -84,6 +88,7 @@ impl Tag {
         self.comments.remove(&tag)
     }
 
+    #[must_use]
     pub fn get_vendor(&self) -> &str {
         &self.vendor
     }
