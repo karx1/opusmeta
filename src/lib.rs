@@ -38,7 +38,8 @@ pub struct Tag {
 impl Tag {
     pub fn new(vendor: String, comments: Vec<(String, String)>) -> Self {
         let mut comments_map = HashMap::new();
-        for (key, value) in comments.into_iter() {
+        for (mut key, value) in comments.into_iter() {
+            key.make_ascii_lowercase();
             comments_map
                 .entry(key)
                 .and_modify(|v: &mut Vec<String>| v.push(value.clone()))
@@ -51,26 +52,30 @@ impl Tag {
         }
     }
 
-    pub fn add_one(&mut self, tag: String, value: String) {
+    pub fn add_one(&mut self, mut tag: String, value: String) {
+        tag.make_ascii_lowercase();
         self.comments
             .entry(tag)
             .and_modify(|v: &mut Vec<String>| v.push(value.clone()))
             .or_insert(vec![value]);
     }
 
-    pub fn add_many(&mut self, tag: String, mut values: Vec<String>) {
+    pub fn add_many(&mut self, mut tag: String, mut values: Vec<String>) {
+        tag.make_ascii_lowercase();
         self.comments
             .entry(tag)
             .and_modify(|v: &mut Vec<String>| v.append(&mut values))
             .or_insert(values);
     }
 
-    pub fn get(&self, tag: &str) -> Option<&Vec<String>> {
-        self.comments.get(tag)
+    pub fn get(&self, mut tag: String) -> Option<&Vec<String>> {
+        tag.make_ascii_lowercase();
+        self.comments.get(&tag)
     }
 
-    pub fn remove_entries(&mut self, tag: &str) -> Option<Vec<String>> {
-        self.comments.remove(tag)
+    pub fn remove_entries(&mut self, mut tag: String) -> Option<Vec<String>> {
+        tag.make_ascii_lowercase();
+        self.comments.remove(&tag)
     }
 
     pub fn get_vendor(&self) -> &str {
