@@ -1,6 +1,9 @@
 use crate::Result;
 use base64::prelude::{Engine as _, BASE64_STANDARD};
+use mime_sniffer::MimeTypeSniffer;
+use std::fs::OpenOptions;
 use std::io::{Cursor, Read};
+use std::path::Path;
 use thiserror::Error;
 
 #[allow(dead_code)] // todo: change this to expect
@@ -9,7 +12,8 @@ use thiserror::Error;
 pub enum PictureType {
     #[default]
     Other = 0,
-    Icon,
+    FileIcon,
+    OtherIcon,
     CoverFront,
     CoverBack,
     LeafletPage,
@@ -52,6 +56,8 @@ pub enum PictureDecodeError {
     DataTooLong,
     #[error("Failed to decode base64 data")]
     Base64DecodeError(#[from] base64::DecodeError),
+    #[error("Failed to sniff mime type from file")]
+    NoMimeType,
 }
 
 #[allow(dead_code)]
@@ -140,6 +146,7 @@ impl Picture {
         let mut output = vec![];
 
         output.extend_from_slice(&(self.picture_type as u32).to_be_bytes());
+        dbg!(self.picture_type as u32);
 
         let mime_length: u32 = self
             .mime_type
@@ -187,5 +194,28 @@ impl Picture {
         let pic = Self::from_bytes(&bytes)?;
 
         Ok(pic)
+    }
+
+    pub fn read_from<R: Read>(mut f_in: R, mime_type: Option<String>) -> Result<Self> {
+        let mut output = vec![];
+        f_in.read_to_end(&mut output)?;
+
+        let mime_type = match mime_type {
+            Some(s) => s,
+            None => output
+                .sniff_mime_type()
+                .ok_or(PictureDecodeError::NoMimeType)?
+                .into(),
+        };
+
+        let mut pic = Self::new();
+        pic.mime_type = mime_type;
+        pic.data = output;
+        Ok(pic)
+    }
+
+    pub fn read_from_path<P: AsRef<Path>>(path: P, mime_type: Option<String>) -> Result<Self> {
+        let file = OpenOptions::new().read(true).open(path)?;
+        Self::read_from(file, mime_type)
     }
 }

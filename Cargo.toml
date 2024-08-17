@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 base64 = "0.22"
+mime-sniffer = "0.1.2"
 ogg = "0.9"
 thiserror = "1"
 
