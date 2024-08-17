@@ -21,7 +21,17 @@ pub enum Error {
 
 pub type Result<T> = std::result::Result<T, Error>;
 
-pub fn read_from<R: Read + Seek>(f_in: R) -> Result<()> {
+pub struct Tag {
+    comments: Vec<(String, String)>,
+}
+
+impl Tag {
+    pub fn new(comments: Vec<(String, String)>) -> Self {
+        Self { comments }
+    }
+}
+
+pub fn read_from<R: Read + Seek>(f_in: R) -> Result<Tag> {
     let mut reader = PacketReader::new(f_in);
     let first_packet = reader.read_packet()?.ok_or(Error::MissingPacket)?;
     if !first_packet.data.starts_with("OpusHead".as_bytes()) {
@@ -55,6 +65,5 @@ pub fn read_from<R: Read + Seek>(f_in: R) -> Result<()> {
             .ok_or_else(|| Error::MalformedComment(buffer.clone()))?;
         comments.push(pair);
     }
-    dbg!(comments);
-    Ok(())
+    Ok(Tag::new(comments))
 }
