@@ -1,6 +1,7 @@
 use ogg::{PacketReader, PacketWriteEndInfo, PacketWriter};
 use std::collections::HashMap;
 use std::fs::File;
+use std::fs::OpenOptions;
 use std::io::Cursor;
 use std::io::{Read, Seek, Write};
 use std::path::Path;
@@ -164,7 +165,7 @@ fn get_end_info(packet: &ogg::Packet) -> PacketWriteEndInfo {
     }
 }
 
-pub fn replace<W: Read + Write + Seek>(mut f_in: W, tag: Tag) -> Result<()> {
+pub fn write_to<W: Read + Write + Seek>(mut f_in: W, tag: Tag) -> Result<()> {
     let f_out_raw: Vec<u8> = vec![];
     let mut cursor = Cursor::new(f_out_raw);
 
@@ -208,4 +209,9 @@ pub fn replace<W: Read + Write + Seek>(mut f_in: W, tag: Tag) -> Result<()> {
     std::io::copy(&mut cursor, &mut f_in)?;
 
     Ok(())
+}
+
+pub fn write_to_path<P: AsRef<Path>>(path: P, tag: Tag) -> Result<()> {
+    let file = OpenOptions::new().read(true).write(true).open(path)?;
+    write_to(file, tag)
 }

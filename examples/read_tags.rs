@@ -1,5 +1,4 @@
-use opusmeta::{read_from_path, replace, Result};
-use std::fs::OpenOptions;
+use opusmeta::{read_from_path, write_to_path, Result};
 
 fn main() -> Result<()> {
     let path = std::env::args_os().nth(1).expect("No input file specified");
@@ -9,7 +8,6 @@ fn main() -> Result<()> {
     comments.add_one("ARTIST".into(), "Someone Else".into());
     println!("{comments:#?}");
 
-    let file = OpenOptions::new().read(true).write(true).open(path)?;
-    replace(file, comments).unwrap();
+    write_to_path(path, comments).unwrap();
     Ok(())
 }
