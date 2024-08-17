@@ -74,7 +74,6 @@ pub fn read_from<R: Read + Seek>(f_in: R) -> Result<Tag> {
         return Err(Error::NotOpus);
     }
     let header_packet = reader.read_packet()?.ok_or(Error::MissingPacket)?;
-    println!("{}", String::from_utf8_lossy(&header_packet.data));
     let mut cursor = Cursor::new(header_packet.data);
     cursor.seek_relative(8)?; // length of string "OpusTags"
     let mut buffer = [0; 4];
