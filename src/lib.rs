@@ -27,7 +27,7 @@ pub enum Error {
     UTFError(#[from] std::string::FromUtf8Error),
     #[error("The content was too big for the Opus spec")]
     TooBigError,
-    #[error("An error occured when decoding a picture")]
+    #[error("An error occured when decoding a picture: {0}")]
     PictureDecodeError(#[from] picture::PictureDecodeError),
     #[error("This crate expects `usize` to be at least 32 bytes in size.")]
     PlatformError(#[from] std::num::TryFromIntError),

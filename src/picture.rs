@@ -47,6 +47,8 @@ pub enum PictureDecodeError {
     MimeTooLong,
     #[error("Description is too long (more than u32::MAX bytes long!)")]
     DescriptionTooLong,
+    #[error("Picture data is too long (more than u32::MAX bytes long!)")]
+    DataTooLong,
 }
 
 #[allow(dead_code)]
@@ -128,5 +130,42 @@ impl Picture {
             num_colors,
             data,
         })
+    }
+
+    pub fn to_bytes(&self) -> std::result::Result<Vec<u8>, PictureDecodeError> {
+        let mut output = vec![];
+
+        output.extend_from_slice(&(self.picture_type as u32).to_be_bytes());
+
+        let mime_length: u32 = self
+            .mime_type
+            .len()
+            .try_into()
+            .map_err(|_| PictureDecodeError::MimeTooLong)?;
+        output.extend_from_slice(&mime_length.to_be_bytes());
+        output.extend_from_slice(self.mime_type.as_bytes());
+
+        let desc_length: u32 = self
+            .description
+            .len()
+            .try_into()
+            .map_err(|_| PictureDecodeError::DescriptionTooLong)?;
+        output.extend_from_slice(&desc_length.to_be_bytes());
+        output.extend_from_slice(self.description.as_bytes());
+
+        output.extend_from_slice(&self.width.to_be_bytes());
+        output.extend_from_slice(&self.height.to_be_bytes());
+        output.extend_from_slice(&self.depth.to_be_bytes());
+        output.extend_from_slice(&self.num_colors.to_be_bytes());
+
+        let data_len: u32 = self
+            .data
+            .len()
+            .try_into()
+            .map_err(|_| PictureDecodeError::DataTooLong)?;
+        output.extend_from_slice(&data_len.to_be_bytes());
+        output.extend_from_slice(&self.data);
+
+        Ok(output)
     }
 }
