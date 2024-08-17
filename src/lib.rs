@@ -1,4 +1,5 @@
 use ogg::PacketReader;
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::Cursor;
 use std::io::{Read, Seek};
@@ -23,13 +24,46 @@ pub enum Error {
 
 pub type Result<T> = std::result::Result<T, Error>;
 
+#[derive(Debug)]
 pub struct Tag {
-    comments: Vec<(String, String)>,
+    comments: HashMap<String, Vec<String>>,
 }
 
 impl Tag {
     pub fn new(comments: Vec<(String, String)>) -> Self {
-        Self { comments }
+        let mut comments_map = HashMap::new();
+        for (key, value) in comments.into_iter() {
+            comments_map
+                .entry(key)
+                .and_modify(|v: &mut Vec<String>| v.push(value.clone()))
+                .or_insert(vec![value]);
+        }
+
+        Self {
+            comments: comments_map,
+        }
+    }
+
+    pub fn add_one(&mut self, tag: String, value: String) {
+        self.comments
+            .entry(tag)
+            .and_modify(|v: &mut Vec<String>| v.push(value.clone()))
+            .or_insert(vec![value]);
+    }
+
+    pub fn add_many(&mut self, tag: String, mut values: Vec<String>) {
+        self.comments
+            .entry(tag)
+            .and_modify(|v: &mut Vec<String>| v.append(&mut values))
+            .or_insert(values);
+    }
+
+    pub fn get(&self, tag: &str) -> Option<&Vec<String>> {
+        self.comments.get(tag)
+    }
+
+    pub fn remove_entries(&mut self, tag: &str) -> Option<Vec<String>> {
+        self.comments.remove(tag)
     }
 }
 
