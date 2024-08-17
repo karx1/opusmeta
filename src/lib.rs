@@ -15,6 +15,8 @@ pub enum Error {
     HeaderError(#[from] std::io::Error),
     #[error("The error was malformed: {0}")]
     MalformedPacket(String),
+    #[error("Encountered a comment which was formatted wrong or was not valid UTF-8.")]
+    MalformedComment(Vec<u8>),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -31,9 +33,28 @@ pub fn read_from<R: Read + Seek>(f_in: R) -> Result<()> {
     cursor.seek_relative(8)?; // length of string "OpusTags"
     let mut buffer = [0; 4];
     cursor.read_exact(&mut buffer)?;
-    // only panics on platforms where usize < 32 bits
     let vendor_length = u32::from_le_bytes(buffer);
     // we don't care about what the vendor actually is so we can skip it
     cursor.seek_relative(vendor_length.into())?;
+    let mut buffer = [0; 4];
+    cursor.read_exact(&mut buffer)?;
+    let comment_count = u32::from_le_bytes(buffer);
+    let mut comments: Vec<(String, String)> = Vec::new();
+    for _ in 0..comment_count {
+        let mut buffer = [0; 4];
+        cursor.read_exact(&mut buffer)?;
+        // only panics on platforms where usize < 32 bits
+        let comment_length: usize = u32::from_le_bytes(buffer).try_into().unwrap();
+        let mut buffer = vec![0; comment_length];
+        cursor.read_exact(&mut buffer)?;
+        let comment =
+            std::str::from_utf8(&buffer).map_err(|_| Error::MalformedComment(buffer.clone()))?;
+        let pair = comment
+            .split_once('=')
+            .map(|(tag, value)| (tag.to_string(), value.to_string()))
+            .ok_or_else(|| Error::MalformedComment(buffer.clone()))?;
+        comments.push(pair);
+    }
+    dbg!(comments);
     Ok(())
 }
