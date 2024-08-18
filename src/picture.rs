@@ -7,7 +7,7 @@ use crate::Result;
 use base64::prelude::{Engine as _, BASE64_STANDARD};
 use mime_sniffer::MimeTypeSniffer;
 use std::fs::OpenOptions;
-use std::io::{Cursor, Read};
+use std::io::{Cursor, Read, Seek};
 use std::path::Path;
 use thiserror::Error;
 
@@ -89,10 +89,6 @@ pub struct Picture {
     pub picture_type: PictureType,
     pub mime_type: String,
     pub description: String,
-    pub width: u32,
-    pub height: u32,
-    pub depth: u32,
-    pub num_colors: u32,
     pub data: Vec<u8>,
 }
 
@@ -131,25 +127,8 @@ impl Picture {
         cursor.read_exact(&mut buffer)?;
         let description = String::from_utf8(buffer)?;
 
-        // width
-        let mut buffer = [0; 4];
-        cursor.read_exact(&mut buffer)?;
-        let width = u32::from_be_bytes(buffer);
-
-        // height
-        let mut buffer = [0; 4];
-        cursor.read_exact(&mut buffer)?;
-        let height = u32::from_be_bytes(buffer);
-
-        // depth
-        let mut buffer = [0; 4];
-        cursor.read_exact(&mut buffer)?;
-        let depth = u32::from_be_bytes(buffer);
-
-        // num_colors
-        let mut buffer = [0; 4];
-        cursor.read_exact(&mut buffer)?;
-        let num_colors = u32::from_be_bytes(buffer);
+        // skip width, height, depth, and num_colors (4 bytes each)
+        cursor.seek_relative(16)?;
 
         // data
         let mut buffer = [0; 4];
@@ -162,10 +141,6 @@ impl Picture {
             picture_type,
             mime_type,
             description,
-            width,
-            height,
-            depth,
-            num_colors,
             data,
         })
     }
@@ -196,10 +171,10 @@ impl Picture {
         output.extend_from_slice(&desc_length.to_be_bytes());
         output.extend_from_slice(self.description.as_bytes());
 
-        output.extend_from_slice(&self.width.to_be_bytes());
-        output.extend_from_slice(&self.height.to_be_bytes());
-        output.extend_from_slice(&self.depth.to_be_bytes());
-        output.extend_from_slice(&self.num_colors.to_be_bytes());
+        // write zeros for width, height, depth, and num_colors (4 bytes each)
+        // because honestly i dont care about these
+        let zero = [0; 16];
+        output.extend_from_slice(&zero);
 
         let data_len: u32 = self
             .data
