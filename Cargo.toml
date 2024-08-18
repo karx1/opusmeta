@@ -12,3 +12,6 @@ thiserror = "1"
 [lints.clippy.pedantic]
 level = "warn"
 priority = -1
+
+[lints.clippy]
+nursery = "warn"

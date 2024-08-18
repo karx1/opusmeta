@@ -84,7 +84,7 @@ impl Tag {
             comments_map
                 .entry(key)
                 .and_modify(|v: &mut Vec<String>| v.push(value.clone()))
-                .or_insert(vec![value]);
+                .or_insert_with(|| vec![value]);
         }
 
         Self {
@@ -99,7 +99,7 @@ impl Tag {
         self.comments
             .entry(tag)
             .and_modify(|v: &mut Vec<String>| v.push(value.clone()))
-            .or_insert(vec![value]);
+            .or_insert_with(|| vec![value]);
     }
 
     /// Add multiple entries.
@@ -215,7 +215,7 @@ impl Tag {
     pub fn read_from<R: Read + Seek>(f_in: R) -> Result<Self> {
         let mut reader = PacketReader::new(f_in);
         let first_packet = reader.read_packet()?.ok_or(Error::MissingPacket)?;
-        if !first_packet.data.starts_with("OpusHead".as_bytes()) {
+        if !first_packet.data.starts_with(b"OpusHead") {
             return Err(Error::NotOpus);
         }
         let header_packet = reader.read_packet()?.ok_or(Error::MissingPacket)?;
@@ -328,7 +328,7 @@ impl Tag {
     fn to_packet_data(&self) -> Result<Vec<u8>> {
         let mut output = vec![];
         // magic signature
-        output.extend_from_slice("OpusTags".as_bytes());
+        output.extend_from_slice(b"OpusTags");
 
         // encode vendor
         let vendor = &self.vendor;

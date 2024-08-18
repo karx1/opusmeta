@@ -51,7 +51,7 @@ impl PictureType {
         if num > 20 {
             Err(PictureError::InvalidPictureType)
         } else {
-            Ok(unsafe { std::mem::transmute::<u32, PictureType>(num) })
+            Ok(unsafe { std::mem::transmute::<u32, Self>(num) })
         }
     }
 }
