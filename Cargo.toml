@@ -12,8 +12,3 @@ thiserror = "1"
 [lints.clippy.pedantic]
 level = "warn"
 priority = -1
-
-[lints.clippy]
-# temporary until i start writing docs
-missing_errors_doc = "allow"
-
