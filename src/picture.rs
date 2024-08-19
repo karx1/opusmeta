@@ -153,7 +153,6 @@ impl Picture {
         let mut output = vec![];
 
         output.extend_from_slice(&(self.picture_type as u32).to_be_bytes());
-        dbg!(self.picture_type as u32);
 
         let mime_length: u32 = self
             .mime_type
