@@ -1,10 +1,11 @@
 [package]
 name = "opusmeta"
-version = "1.0.0"
+version = "1.0.1"
 edition = "2021"
 description = "A Rust crate for reading and writing metadata to opus files"
 license = "MIT"
 repository = "https://github.com/karx1/opusmeta"
+homepage = "https://karx.xyz/projects/opusmeta"
 exclude = ["examples/"]
 
 [dependencies]
