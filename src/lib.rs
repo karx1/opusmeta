@@ -118,6 +118,12 @@ impl Tag {
         self.comments.get(&tag)
     }
 
+    /// Gets the first entry for a particular key, or None if no occurences of the key exist.
+    #[must_use]
+    pub fn get_one(&self, tag: String) -> Option<&String> {
+        self.get(tag).and_then(|v| v.first())
+    }
+
     /// Remove all entries for a particular key. Optionally returns the removed values, if any.
     pub fn remove_entries(&mut self, mut tag: String) -> Option<Vec<String>> {
         tag.make_ascii_lowercase();
