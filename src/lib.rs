@@ -185,31 +185,27 @@ impl Tag {
     /// # Errors
     /// This function will error  if encoding the given data to Opus format or to base64 errors.
     pub fn add_picture(&mut self, picture: &Picture) -> Result<()> {
-        let _ = self.remove_picture_type(picture.picture_type)?;
+        let _ = self.remove_picture_type(picture.picture_type);
         let data = picture.to_base64()?;
         self.add_one(PICTURE_BLOCK_TAG.into(), data);
         Ok(())
     }
 
-    /// Removes a picture with the given picture type. Returns the removed picture for convenience.
-    /// # Errors
-    /// This function will never error.
-    /// The reason it returns a Result is due to backwards compatibility reasons.
-    pub fn remove_picture_type(&mut self, picture_type: PictureType) -> Result<Option<Picture>> {
-        let Some(pictures) = self.comments.get_mut(PICTURE_BLOCK_TAG) else {
-            return Ok(None);
-        };
+    /// Removes a picture with the given picture type. Returns the removed picture for convenience,
+    /// or None if a picture with the given picture type was not found.
+    pub fn remove_picture_type(&mut self, picture_type: PictureType) -> Option<Picture> {
+        let pictures = self.comments.get_mut(PICTURE_BLOCK_TAG)?;
 
         for (index, data) in (*pictures).iter().enumerate() {
             if let Ok(pic) = Picture::from_base64(data)
                 && pic.picture_type == picture_type
             {
                 pictures.remove(index);
-                return Ok(Some(pic));
+                return Some(pic);
             }
         }
 
-        Ok(None)
+        None
     }
 
     /// Gets a picture which has a certain picture type, or None if there are no pictures with that
