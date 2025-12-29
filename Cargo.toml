@@ -16,6 +16,3 @@ ogg = "0.9"
 [lints.clippy.pedantic]
 level = "warn"
 priority = -1
-
-[lints.clippy]
-nursery = "warn"
