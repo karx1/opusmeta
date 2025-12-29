@@ -1,5 +1,9 @@
+//! This module contains utility types/traits.
+
 use std::borrow::Cow;
 use std::fmt::Display;
+use std::fs::File;
+use std::io::{Cursor, Read, Seek, Write};
 use std::ops::Deref;
 
 /// A lowercase String. Holds a [`Cow<str>`] internally.
@@ -57,6 +61,56 @@ impl<'a> LowercaseString<'a> {
 impl<S: AsRef<str>> From<S> for LowercaseString<'static> {
     fn from(str: S) -> Self {
         Self::from_string(str.as_ref().to_string())
+    }
+}
+
+/// A trait representing a file-like reader/writer.
+///
+/// This trait is the combination of the [`std::io`]
+/// stream traits with an additional method to resize the file.
+pub trait StorageFile: Read + Write + Seek {
+    /// Resize the file. This method behaves the same as
+    /// [`File::set_len`].
+    /// # Errors
+    /// See [`File::set_len`] for reasons this function could error.
+    fn set_len(&mut self, new_size: u64) -> crate::Result<()>;
+}
+
+impl<T: StorageFile> StorageFile for &mut T {
+    fn set_len(&mut self, new_size: u64) -> crate::Result<()> {
+        T::set_len(self, new_size)
+    }
+}
+
+impl StorageFile for File {
+    fn set_len(&mut self, new_size: u64) -> crate::Result<()> {
+        Ok(File::set_len(self, new_size)?)
+    }
+}
+
+impl StorageFile for &File {
+    fn set_len(&mut self, new_size: u64) -> crate::Result<()> {
+        Ok(File::set_len(self, new_size)?)
+    }
+}
+
+impl StorageFile for Cursor<Vec<u8>> {
+    fn set_len(&mut self, new_size: u64) -> crate::Result<()> {
+        // This will only cause a problem on 32-bit platforms
+        // But if we run into this problem then the Vec is too big for memory anyway
+        #[allow(clippy::cast_possible_truncation)]
+        self.get_mut().resize(new_size as usize, 0);
+        Ok(())
+    }
+}
+
+impl StorageFile for Cursor<&mut Vec<u8>> {
+    fn set_len(&mut self, new_size: u64) -> crate::Result<()> {
+        // This will only cause a problem on 32-bit platforms
+        // But if we run into this problem then the Vec is too big for memory anyway
+        #[allow(clippy::cast_possible_truncation)]
+        self.get_mut().resize(new_size as usize, 0);
+        Ok(())
     }
 }
 
