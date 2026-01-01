@@ -1,6 +1,6 @@
 [package]
 name = "opusmeta"
-version = "2.0.1"
+version = "3.0.0"
 edition = "2024"
 description = "A Rust crate for reading and writing metadata to opus files"
 license = "MIT"
